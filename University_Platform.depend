@@ -1,6 +1,10 @@
 # depslib dependency file v1.0
-1717805712 source:d:\projects\university_platform_codeblocks\main.cpp
+1718012218 source:d:\projects\university_platform_codeblocks\main.cpp
 	<iostream>
 	<sqlite3.h>
 	<filesystem>
+	<string>
+	<vector>
+	<iomanip>
+	<windows.h>
 
