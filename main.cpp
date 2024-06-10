@@ -20,11 +20,12 @@ static int callback(void* data, int argc, char** argv, char** azColName);
 void login(int &User, string &User_Capacity, int &error_login);
 void Print_Query(string sql, int error);
 int Retrieve_User_id(string FirstName, string LastName, int error);
-void Delete_User(int User_id, int error);
+int Retrieve_Course_id(string CourseTitle);
 bool IsEntryExists_One_Value(sqlite3* db, const string& tableName, const string& columnName, const string& value);
 bool IsEntryExists_Two_Values(sqlite3* db, const string& tableName, const string& columnName1, const string& value1, const string& columnName2, const string& value2);
 void Insert_User(int error);
-
+void Update_Instance(int error);
+void Delete_Instance();
 
 
 int main(){
@@ -40,24 +41,6 @@ int main(){
 
 
     while(true){
-/*
-            //// testing
-            int error{-1};
-            Insert_User(error);
-            string test_action;
-            cout << "Continue? [Yes -> y, No -> n] ";
-            cin >> test_action;
-            if (test_action == "y"){
-
-            }else{
-                return 0;
-            }
-
-
-
-
-            //// testing
-*/
 
 
             string action;
@@ -79,12 +62,12 @@ int main(){
                 continue;
             }
 
-        cout << "Login successful!" << endl;
+        cout << "Login successful! " << endl;
 
 
 
         while(User_Capacity == "admin"){
-                    cout << "What you want to do? [See users -> see ," << endl;
+                    cout << "What you want to do? [Print table -> print ," << endl;
                     cout << "                      Edit entity -> edit," << endl;
                     cout << "                      Insert entity -> insert," << endl;
                     cout << "                      Delete entity -> delete," << endl;
@@ -93,32 +76,49 @@ int main(){
 
                     if (action == "logout"){
                         break;
-                    }else if( action == "see"){
-                            int error {};
-                            string sql;
-                            sql =              string("SELECT FirstName, LastName, Age, Wage, StartDate, NULL AS StudyYear "
-                                               "FROM Employees "
-                                               "UNION ALL "
-                                               "SELECT FirstName, LastName, Age, NULL AS Wage, StartDate, StudyYear "
-                                               "FROM Students "
-                                               ";");
-                            Print_Query(sql,error);
+                    }else if( action == "print"){
+                            cout << "Which table you want to print?" << endl;
+                            cout << "[Users -> users, Courses, Courses -> courses]" << endl;
+                            string another_action;
+                            cin >> another_action;
+                            if(another_action == "users"){
+                                int error {};
+                                string sql;
+                                sql =              string("SELECT FirstName, LastName, Age, Wage, StartDate, NULL AS StudyYear, Role "
+                                                   "FROM Employees "
+                                                   "UNION ALL "
+                                                   "SELECT FirstName, LastName, Age, NULL AS Wage, StartDate, StudyYear, 'Student' AS Role "
+                                                   "FROM Students "
+                                                   ";");
+                                Print_Query(sql,error);
+                            } else if (another_action == "courses"){
+                                int error {};
+                                string sql;
+                                sql =              string("SELECT CourseTitle, StudyYear, Semester, WritingPerc FROM Courses ;");
+                                Print_Query(sql,error);
+                                       }
                     }else if( action == "insert" ){
                         int error{-1};
                         Insert_User(error);
+                    }else if( action == "edit" ){
+                        int error {};
+                        Update_Instance(error);
+                    }else if( action == "delete" ){
+                        Delete_Instance();
                     }
                     continue;
+
         }
         while(User_Capacity == "Boarding"){
+                    // Printing all Users
                     int error {};
                     string sql;
-                    sql =              string("SELECT FirstName, LastName, Age, Wage, StartDate, NULL AS StudyYear "
-                                       "FROM Employees "
-                                       "WHERE "
-                                       "UNION ALL "
-                                       "SELECT FirstName, LastName, Age, NULL AS Wage, StartDate, StudyYear "
-                                       "FROM Students "
-                                       ";");
+                    sql =              string("SELECT FirstName, LastName, Age, Wage, StartDate, NULL AS StudyYear, Role "
+                                               "FROM Employees "
+                                               "UNION ALL "
+                                               "SELECT FirstName, LastName, Age, NULL AS Wage, StartDate, StudyYear, 'Student' AS Role "
+                                               "FROM Students "
+                                                           ";");
                     Print_Query(sql,error);
                     break;
         }
@@ -136,7 +136,6 @@ int main(){
                     Print_Query(sql,error);
                     break;
         }
-
         while(User_Capacity == "Teacher"){
                     int error {};
                     string sql;
@@ -163,6 +162,7 @@ int main(){
                     break;
         }
     }
+
     return 0;
 }
 
@@ -186,7 +186,6 @@ void init_db(){
                     "Username	TEXT NOT NULL,"
                     "Password	TEXT NOT NULL,"
                     "Capacity	TEXT NOT NULL"
-                    //"PRIMARY KEY(User_id)"
                     " );";
 
     exit = 0;
@@ -442,9 +441,9 @@ void bootstrap_db(){
     sql   =     "INSERT INTO Courses ( C_id, E_id, CourseTitle , StudyYear,Semester,WritingMarkPerc)"
                 "VALUES"
                 "(1,1,'Electrodynamics',1,'Fall',7),"
-                "(2,3,'Machine Learning',1,'Spring',8),"
-                "(3,4,'Classical Physics',2,'Fall',8),"
-                "(4,5,'Quantum Mechanics',2,'Spring',7)"
+                "(2,3,'Machine_Learning',1,'Spring',8),"
+                "(3,4,'Classical_Physics',2,'Fall',8),"
+                "(4,5,'Quantum_Mechanics',2,'Spring',7)"
                 "; ";
 
     exit = sqlite3_exec(DB, sql.c_str(), NULL, 0, &messaggeError);
@@ -812,36 +811,42 @@ int Retrieve_User_id(string FirstName, string LastName, int error){
     return User_id;
 }
 
-void DELETE_TRY(int User_id, int error){
-    // Creating the database tables
+int Retrieve_Course_id(string CourseTitle){
+    int Course_id{};
 
-    int errors {};
+    // Opening Database
     sqlite3* DB;
-    int exit = 0;
-    exit = sqlite3_open("University_Platform.db", &DB);
-
+    sqlite3_stmt* stmt;
+    int exit = sqlite3_open("University_Platform.db", &DB);
     if (exit != SQLITE_OK) {
-        cerr << "Error openning DB " << sqlite3_errmsg(DB) << endl;
-
-        return;
+        cerr << "Error opening DB " << sqlite3_errmsg(DB) << endl;
+        return -1;
     }
 
-    // Creating Users table
-    string sql = "UPDATE Students SET FirstName = 'FanisFanis' WHERE User_id = " + to_string(User_id) + " ; ";
-    //string sql =    "DELETE FROM Users WHERE User_id = "+ to_string(User_id) + " ; " ;
-    sql   =     "INSERT INTO Users ( Username, Password, Capacity)"
-                "VALUES"
-                "('admin_2','admin_2','admin_2')"
-                " ; ";
-    exit = 0;
-    char* messaggeError;
-    exit = sqlite3_exec(DB, sql.c_str(), NULL, 0, &messaggeError);
-    if (exit != SQLITE_OK) {
-        cerr << "Error Creating Users Table" << endl;
-        cout<< messaggeError << endl;
-        sqlite3_free(messaggeError);
+    // Preparing the SQL statement
+    string sql = string("SELECT C_id FROM Courses WHERE CourseTitle = ? ;");
+    exit = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, 0);
+    if ( exit != SQLITE_OK) {
+        cerr << "Failed to prepare statement: " << sqlite3_errmsg(DB) << endl;
+        sqlite3_close(DB);
+        return -1;
     }
+
+    // Bind the CourseTitle to the statement
+    sqlite3_bind_text(stmt, 1, CourseTitle.c_str(), -1, SQLITE_STATIC);
+
+
+    // Execute the statement and check if the CourseTitle exists
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        Course_id = sqlite3_column_int(stmt, 0); // Retrieve the Course_id
+    }else{
+        sqlite3_finalize(stmt);
+        sqlite3_close(DB);
+        return -1;
+    }
+    sqlite3_finalize(stmt);
     sqlite3_close(DB);
+    return Course_id;
 }
 
 bool IsEntryExists_One_Value(sqlite3* db, const string& tableName, const string& columnName, const string& value) {
@@ -1030,7 +1035,7 @@ void Insert_User(int error) {
         }
 
         // Inserting the User instance
-        sql = "INSERT INTO Users (Username, Password, Capacity) VALUES (?, ?, 'User');";
+        sql = "INSERT INTO Users (Username, Password, Capacity) VALUES (?, ?, ?);";
         sqlite3_stmt *stmt;
         int result = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, nullptr);
         if (result != SQLITE_OK) {
@@ -1042,6 +1047,8 @@ void Insert_User(int error) {
         // Binding the values
         sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 2, password.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, capacity.c_str(), -1, SQLITE_STATIC);
+
 
         // Executing the statement
         result = sqlite3_step(stmt);
@@ -1134,4 +1141,434 @@ void Insert_User(int error) {
 
     // Reset text console color to default
     SetConsoleTextAttribute(hConsole, defaultAttributes);
+}
+
+void Update_Instance(int error){
+    string action;
+    cout << "Do you what to Update a Person entry or a Course? [Type person or course]";
+    cin >> action;
+
+
+    if(action == "person"){
+
+        // Printing all Users
+        string sql;
+        sql =              string("SELECT FirstName, LastName, Age, Wage, StartDate, NULL AS StudyYear, Role "
+                                   "FROM Employees "
+                                   "UNION ALL "
+                                   "SELECT FirstName, LastName, Age, NULL AS Wage, StartDate, StudyYear, 'Student' AS Role "
+                                   "FROM Students "
+                                    ";");
+        Print_Query(sql,error);
+
+        // Retrieving the Full Name of the person
+        string FirstName, LastName;
+        cout << "Which entry you want to edit?" << endl;
+        cout << "Type the following information about the entry:" << endl;
+        cout << "FirstName: ";
+        cin >> FirstName;
+        cout << "LastName: ";
+        cin >> LastName;
+
+
+        // Retrieving the User_id of the user with the inserted Full Name
+        int User_id = Retrieve_User_id(FirstName, LastName, error);
+        if(User_id == -1){
+            cout << "Person doesn't exist" << endl;
+            return;
+        }
+
+        // Retrieving the Capacity of the user
+        sqlite3* DB;
+        sqlite3_stmt* stmt;
+        int exit = 0;
+        exit = sqlite3_open("University_Platform.db", &DB);
+        if (exit != SQLITE_OK) {
+            cerr << "Error opening DB " << sqlite3_errmsg(DB) << endl;
+            return;
+        }
+
+        // Preparing the SQL statement
+        sql =            string("SELECT Capacity FROM Users WHERE User_id = ? ;");
+        exit = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, 0);
+        if ( exit != SQLITE_OK) {
+            cerr << "Failed to prepare statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Bind the User_id to the statement
+        sqlite3_bind_int(stmt, 1, User_id);
+
+        string capacity;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            capacity = string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))); // Retrieve the Capacity
+        }else{
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+        sqlite3_finalize(stmt);
+
+        if(capacity == "Employee"){
+            sql =              string("SELECT U.Username, U.Password, E.FirstName, E.LastName, E.Age, E.Wage, E.StartDate, E.Role "
+                                    "FROM Users as U, Employees as E "
+                                    "WHERE "
+                                    "U.User_id = " + to_string(User_id) + " AND "
+                                    "U.User_id = E.User_id "
+                                    ";");
+            Print_Query(sql,error);
+        }else if(capacity == "Student"){
+            sql =              string("SELECT U.Username, U.Password, S.FirstName, S.LastName, S.Age, S.StartDate, S.StudyYear "
+                                    "FROM Users as U, Students as S "
+                                    "WHERE "
+                                    "U.User_id = " + to_string(User_id) + " AND "
+                                    "U.User_id = S.User_id "
+                                    ";");
+            Print_Query(sql,error);
+        }else{
+            cout << "Unidentified User capacity." << capacity << endl;
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+
+        string column, replacement;
+        cout << "Which column you want to edit and what to want to replace it to? " << endl;
+        cout << "Column: ";
+        cin >> column;
+        cout << "Replacement: ";
+        cin >> replacement;
+
+        // Checking that the column input was correct
+        if ( column != "Username" && column != "Password" && column != "FirstName" && column != "LastName" &&
+             column != "Age" && column != "Wage" && column != "StartDate" && column != "Role"  && column != "StudyYear" &&
+             (column == "Wage" && capacity != "Employee") && (column == "Role" && capacity != "Employee") &&
+            (column == "StudyYear" && capacity != "Student")){
+                cout << "Wrong Column name" << endl;
+                return;
+            }
+        string table_name;
+        if (capacity == "Employee"){
+            table_name = "Employees";
+        }else if(capacity == "Student"){
+            table_name = "Students";
+        }
+
+        sql =               string("UPDATE " + table_name + " SET " + column + " = " + replacement + " WHERE User_id = " + to_string(User_id) +" ;");
+        int result = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, nullptr);
+        if (result != SQLITE_OK) {
+            cerr << "Error preparing statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Executing the statement
+        result = sqlite3_step(stmt);
+        if (result != SQLITE_DONE) {
+            cerr << "Error updating data: " << sqlite3_errmsg(DB) << endl;
+        }
+
+        if(capacity == "Employee"){
+            sql =              string("SELECT U.Username, U.Password, E.FirstName, E.LastName, E.Age, E.Wage, E.StartDate, E.Role "
+                                    "FROM Users as U, Employees as E "
+                                    "WHERE "
+                                    "U.User_id = " + to_string(User_id) + " AND "
+                                    "U.User_id = E.User_id "
+                                    ";");
+            Print_Query(sql,error);
+        }else if(capacity == "Student"){
+            sql =              string("SELECT U.Username, U.Password, S.FirstName, S.LastName, S.Age, S.StartDate, S.StudyYear "
+                                    "FROM Users as U, Students as S "
+                                    "WHERE "
+                                    "U.User_id = " + to_string(User_id) + " AND "
+                                    "U.User_id = S.User_id "
+                                    ";");
+            Print_Query(sql,error);
+        }
+
+        sqlite3_finalize(stmt);
+        sqlite3_close(DB);
+
+    }else if(action == "course"){
+
+        // Printing the Courses
+        string sql;
+        sql =              string("SELECT CourseTitle, StudyYear, Semester, WritingMarkPerc FROM Courses ;");
+        Print_Query(sql,error);
+
+        // Retrieving the Title of the Course
+        string CourseTitle;
+        cout << "Which entry you want to edit?" << endl;
+        cout << "Type the CourseTitle:";
+        cin >> CourseTitle;
+
+        // Retrieving the Course_id
+        int Course_id = Retrieve_Course_id(CourseTitle);
+        if(Course_id == -1){
+            cout << "Person doesn't exist" << endl;
+            return;
+        }
+
+        // Opening Database
+        sqlite3* DB;
+        sqlite3_stmt* stmt;
+        int exit = 0;
+        exit = sqlite3_open("University_Platform.db", &DB);
+        if (exit != SQLITE_OK) {
+            cerr << "Error opening DB " << sqlite3_errmsg(DB) << endl;
+            return;
+        }
+
+        // Printing the CourseTitle instance
+        sql =             string("SELECT CourseTitle, StudyYear, Semester, WritingMarkPerc "
+                                    "FROM Courses "
+                                    "WHERE C_id = " + to_string(Course_id) + " ; ");
+        Print_Query(sql,error);
+
+        string column, replacement;
+        cout << "Which column you want to edit and what to want to replace it to? " << endl;
+        cout << "Column: ";
+        cin >> column;
+        cout << "Replacement: ";
+        cin >> replacement;
+
+        // Checking that the column input was correct
+        if ( column != "CourseTitle" && column != "StudyYear" && column != "Semester" && column != "WritingMarkPerc" ){
+                cout << "Wrong Column name" << endl;
+                return;
+            }
+
+        sql =               string("UPDATE Courses SET " + column + " = " + replacement + " WHERE C_id = " + to_string(Course_id) +" ;");
+        int result = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, nullptr);
+        if (result != SQLITE_OK) {
+            cerr << "Error preparing statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Executing the statement
+        result = sqlite3_step(stmt);
+        if (result != SQLITE_DONE) {
+            cerr << "Error updating data: " << sqlite3_errmsg(DB) << endl;
+        }
+
+        // Printing the Courses
+        sql =              string("SELECT CourseTitle, StudyYear, Semester, WritingMarkPerc "
+                                  "FROM Courses "
+                                  "WHERE C_id = " + to_string(Course_id) + " ;");
+        Print_Query(sql,error);
+
+        sqlite3_finalize(stmt);
+        sqlite3_close(DB);
+    }else{
+        cout << "Wrong input." << endl;
+        return;
+    }
+
+    return;
+}
+
+void Delete_Instance(){
+    string action;
+    cout << "Do you what to Delete a Person entry or a Course? [Type person or course]";
+    cin >> action;
+
+
+    if(action == "person"){
+
+        // Printing all Users
+        string sql;
+        sql =              string("SELECT FirstName, LastName, Age, Wage, StartDate, NULL AS StudyYear, Role "
+                                   "FROM Employees "
+                                   "UNION ALL "
+                                   "SELECT FirstName, LastName, Age, NULL AS Wage, StartDate, StudyYear, 'Student' AS Role "
+                                   "FROM Students "
+                                    ";");
+        int error{-1};
+        Print_Query(sql,error);
+
+        // Retrieving the Full Name of the person
+        string FirstName, LastName;
+        cout << "Which Person you want to Delete?" << endl;
+        cout << "FirstName: ";
+        cin >> FirstName;
+        cout << "LastName: ";
+        cin >> LastName;
+
+
+
+        // Retrieving the User_id of the user with the inserted Full Name
+        int User_id = Retrieve_User_id(FirstName, LastName, error);
+        if(User_id == -1){
+            cout << "Person doesn't exist" << endl;
+            return;
+        }
+
+        string another_action;
+        cout << "Are you sure you want to permanently delete the User with the name: " << FirstName << LastName << " ? [Yes -> y, No -> n] ";
+        cin >> another_action;
+
+        if (another_action != "y"){
+            return;
+        }
+
+        // Retrieving the Capacity of the user
+        sqlite3* DB;
+        sqlite3_stmt* stmt;
+        int exit = 0;
+        exit = sqlite3_open("University_Platform.db", &DB);
+        if (exit != SQLITE_OK) {
+            cerr << "Error opening DB " << sqlite3_errmsg(DB) << endl;
+            return;
+        }
+
+        // Preparing the SQL statement
+        sql =            string("SELECT Capacity FROM Users WHERE User_id = ? ;");
+        exit = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, 0);
+        if ( exit != SQLITE_OK) {
+            cerr << "Failed to prepare statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Bind the User_id to the statement
+        sqlite3_bind_int(stmt, 1, User_id);
+
+        string capacity;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            capacity = string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))); // Retrieve the Capacity
+        }else{
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+        sqlite3_finalize(stmt);
+
+
+        string table_name;
+        if (capacity == "Employee"){
+            table_name = "Employees";
+        }else if(capacity == "Student"){
+            table_name = "Students";
+        }
+
+        // Deleting the entry from the Users table
+        sql =               string("DELETE FROM Users WHERE User_id = " + to_string(User_id) +" ;");
+        int result = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, nullptr);
+        if (result != SQLITE_OK) {
+            cerr << "Error preparing statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Executing the statement
+        result = sqlite3_step(stmt);
+        if (result != SQLITE_DONE) {
+            cerr << "Error deleting data: " << sqlite3_errmsg(DB) << endl;
+        }
+        sqlite3_finalize(stmt);
+
+        // Deleting the entry from the Child table
+        sql =               string("DELETE FROM " + table_name + " WHERE User_id = " + to_string(User_id) +" ;");
+        result = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, nullptr);
+        if (result != SQLITE_OK) {
+            cerr << "Error preparing statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Executing the statement
+        result = sqlite3_step(stmt);
+        if (result != SQLITE_DONE) {
+            cerr << "Error deleting data: " << sqlite3_errmsg(DB) << endl;
+        }
+        sqlite3_finalize(stmt);
+        sqlite3_close(DB);
+        cout << "User successfully deleted." << endl;
+    }else if (action == "course") {
+
+        // Printing all Courses
+        string sql;
+        sql =              string("SELECT CourseTitle, StudyYear, Semester, WritingMarkPerc "
+                                   "FROM Courses ;");
+        int error{-1};
+        Print_Query(sql,error);
+
+        // Retrieving the Full Name of the person
+        string CourseTitle;
+        cout << "Which Course you want to Delete?" << endl;
+        cout << "CourseTitle: ";
+        cin >> CourseTitle;
+
+        // Opening the Database
+        sqlite3* DB;
+        sqlite3_stmt* stmt;
+        int exit = 0;
+        exit = sqlite3_open("University_Platform.db", &DB);
+        if (exit != SQLITE_OK) {
+            cerr << "Error opening DB " << sqlite3_errmsg(DB) << endl;
+            return;
+        }
+        // Retrieving the C_id of the user with the inserted Full Name
+        if(!IsEntryExists_One_Value(DB, "Courses", "CourseTitle", CourseTitle)){
+            cerr << "CourseTitle Doesn't exists." << endl;
+            return;
+        }
+
+        string another_action;
+        cout << "Are you sure you want to permanently delete the Course with the CourseTitle: " << CourseTitle << " ? [Yes -> y, No -> n] ";
+        cin >> another_action;
+
+        if (another_action != "y"){
+            return;
+        }
+
+        // Retrieving the C_id of the Course
+        sql =            string("SELECT C_id FROM Courses WHERE CourseTitle = ? ;");
+        exit = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, 0);
+        if ( exit != SQLITE_OK) {
+            cerr << "Failed to prepare statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Bind the CourseTitle to the statement
+        sqlite3_bind_text(stmt, 1, CourseTitle.c_str(), -1, SQLITE_STATIC);
+
+        int C_id;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            C_id = sqlite3_column_int(stmt, 0); // Retrieve the C_id
+        }else{
+            sqlite3_finalize(stmt);
+            sqlite3_close(DB);
+            return;
+        }
+        sqlite3_finalize(stmt);
+
+
+        // Deleting the entry from the Courses table
+        sql =               string("DELETE FROM Courses WHERE C_id = " + to_string(C_id) +" ;");
+        int result = sqlite3_prepare_v2(DB, sql.c_str(), -1, &stmt, nullptr);
+        if (result != SQLITE_OK) {
+            cerr << "Error preparing statement: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_close(DB);
+            return;
+        }
+
+        // Executing the statement
+        result = sqlite3_step(stmt);
+        if (result != SQLITE_DONE) {
+            cerr << "Error deleting data: " << sqlite3_errmsg(DB) << endl;
+        }
+        sqlite3_finalize(stmt);
+        sqlite3_close(DB);
+        cout << "Course successfully deleted." << endl;
+    }else{
+        cout << "Wrong input." << endl;
+        return;
+    }
 }
