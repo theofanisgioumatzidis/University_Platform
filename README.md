@@ -4,6 +4,7 @@ The application can be ran from CODEBLOCKS after linking it with sqlite3.
 It creates a database and filles it with sample data with the following login info:
 
                 Username        Password        Capacity
+                ----------------------------------------
                 
                 admin           admin           admin
                 
